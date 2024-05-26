@@ -196,7 +196,12 @@ class ABUpdateInstaller {
         boolean enableABPerfMode = Utils.isABPerfModeForceEnabled(mContext) ? true
                 : PreferenceManager.getDefaultSharedPreferences(mContext)
                 .getBoolean(Constants.PREF_AB_PERF_MODE, true);
-        mUpdateEngine.setPerformanceMode(enableABPerfMode);
+
+	try {
+            mUpdateEngine.setPerformanceMode(enableABPerfMode);
+        } catch (ServiceSpecificException e) {
+            Log.e(TAG, "Failed to enable performance mode. Verify that kernel has CFQ enabled");
+        }
 
         String zipFileUri = "file://" + file.getAbsolutePath();
         try {
