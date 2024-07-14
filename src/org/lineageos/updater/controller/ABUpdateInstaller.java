@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017-2024 The LineageOS Project
+ * Copyright (C) 2017 The LineageOS Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,7 +17,6 @@ package org.lineageos.updater.controller;
 
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.os.ServiceSpecificException;
 import android.os.UpdateEngine;
 import android.os.UpdateEngineCallback;
 import android.text.TextUtils;
@@ -214,17 +213,7 @@ class ABUpdateInstaller {
         mUpdateEngine.setPerformanceMode(enableABPerfMode);
 
         String zipFileUri = "file://" + file.getAbsolutePath();
-        try {
-            mUpdateEngine.applyPayload(zipFileUri, offset, 0, headerKeyValuePairs);
-        } catch (ServiceSpecificException e) {
-            if (e.errorCode == 66 /* kUpdateAlreadyInstalled */) {
-                installationDone(true);
-                mUpdaterController.getActualUpdate(mDownloadId).setStatus(UpdateStatus.INSTALLED);
-                mUpdaterController.notifyUpdateChange(mDownloadId);
-                return;
-            }
-            throw e;
-        }
+        mUpdateEngine.applyPayload(zipFileUri, offset, 0, headerKeyValuePairs);
 
         mUpdaterController.getActualUpdate(mDownloadId).setStatus(UpdateStatus.INSTALLING);
         mUpdaterController.notifyUpdateChange(mDownloadId);
@@ -261,7 +250,7 @@ class ABUpdateInstaller {
 
     private void installationDone(boolean needsReboot) {
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(mContext);
-        String id = needsReboot ? mDownloadId : null;
+        String id = needsReboot ? prefs.getString(PREF_INSTALLING_AB_ID, null) : null;
         PreferenceManager.getDefaultSharedPreferences(mContext).edit()
                 .putString(Constants.PREF_NEEDS_REBOOT_ID, id)
                 .remove(PREF_INSTALLING_AB_ID)
