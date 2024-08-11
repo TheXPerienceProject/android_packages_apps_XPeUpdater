@@ -31,10 +31,10 @@ val keystoreProperties = Properties().apply {
 
 android {
     compileSdk = 34
-    namespace = "com.libremobileos.updater"
+    namespace = "mx.xperience.updater"
 
     defaultConfig {
-        applicationId = "com.libremobileos.updater"
+        applicationId = "mx.xperience.updater"
         minSdk = 30
         targetSdk = 34
         versionCode = 1
