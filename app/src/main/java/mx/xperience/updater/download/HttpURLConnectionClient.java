@@ -51,6 +51,11 @@ public class HttpURLConnectionClient implements DownloadClient {
         mProgressListener = progressListener;
         mCallback = callback;
         mUseDuplicateLinks = useDuplicateLinks;
+
+        // Add the HTTP request here:
+        mClient.setRequestMethod("GET"); // Or other HTTP methods like POST, PUT, DELETE
+        mClient.setRequestProperty("User-Agent", "UpdaterXPerience/1.0"); // Set a user agent header
+        // Add other headers as needed
     }
 
     @Override
