@@ -193,7 +193,23 @@ public class UpdaterService extends Service {
             }
         } else if (ACTION_INSTALL_UPDATE.equals(intent.getAction())) {
             String downloadId = intent.getStringExtra(EXTRA_DOWNLOAD_ID);
+
+            if (downloadId == null) {
+                Log.e(TAG, "downloadId is null in ACTION_INSTALL_UPDATE");
+                return START_NOT_STICKY;
+            }
             UpdateInfo update = mUpdaterController.getUpdate(downloadId);
+            if (update == null) {
+                Log.e(TAG, "Update not found for downloadId: " + downloadId);
+                return START_NOT_STICKY;
+            }
+
+            if (mUpdaterController.isInstallingUpdate() || mUpdaterController.isInstallingUpdate(downloadId)) {
+                Log.e(TAG, "Already installing an update, cancel it first");
+                // Opcional: Mostrar notificación o snackbar
+                return START_NOT_STICKY;
+            }
+
             if (update.getPersistentStatus() != UpdateStatus.Persistent.VERIFIED) {
                 throw new IllegalArgumentException(update.getDownloadId() + " is not verified");
             }

@@ -32,7 +32,9 @@ import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
 import android.os.IBinder;
+import android.os.PowerManager;
 import android.os.SystemProperties;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -43,6 +45,7 @@ import android.view.View;
 import android.view.animation.Animation;
 import android.view.animation.LinearInterpolator;
 import android.view.animation.RotateAnimation;
+import android.widget.Button;
 import android.widget.RelativeLayout;
 import android.widget.Spinner;
 import android.widget.TextView;
@@ -74,6 +77,7 @@ import mx.xperience.updater.misc.StringGenerator;
 import mx.xperience.updater.misc.Utils;
 import mx.xperience.updater.model.Update;
 import mx.xperience.updater.model.UpdateInfo;
+import mx.xperience.updater.model.UpdateStatus;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -262,7 +266,35 @@ public class UpdatesActivity extends UpdatesListActivity implements UpdateImport
                     List<UpdateInfo> updates = mUpdaterService.getUpdaterController().getUpdates();
                     if (!updates.isEmpty()) {
                         UpdateInfo update = updates.get(0);
-                        handleDownloadButtonClick(update);
+                        UpdateStatus status = update.getStatus();
+
+                        if (status == UpdateStatus.INSTALLING) {
+                            showCancelInstallationDialog();
+                        } else {
+                            handleDownloadButtonClick(update);
+                        }
+                    }
+                }
+            });
+        }
+
+        Button cancelButton = findViewById(R.id.cancel_button);
+        if (cancelButton != null) {
+            cancelButton.setOnClickListener(v -> {
+                if (mUpdaterService != null) {
+                    List<UpdateInfo> updates = mUpdaterService.getUpdaterController().getUpdates();
+                    if (!updates.isEmpty()) {
+                        UpdateInfo update = updates.get(0);
+                        UpdateStatus status = update.getStatus();
+                        
+                        if (status == UpdateStatus.DOWNLOADING || 
+                            status == UpdateStatus.STARTING || 
+                            status == UpdateStatus.PAUSED ||
+                            status == UpdateStatus.PAUSED_ERROR) {
+                            showCancelDownloadDialog(update);
+                        } else {
+                            showSnackbar(R.string.no_download_to_cancel, Snackbar.LENGTH_SHORT);
+                        }
                     }
                 }
             });
@@ -274,6 +306,12 @@ public class UpdatesActivity extends UpdatesListActivity implements UpdateImport
                     List<UpdateInfo> updates = mUpdaterService.getUpdaterController().getUpdates();
                     if (!updates.isEmpty()) {
                         UpdateInfo update = updates.get(0);
+                        UpdaterController controller = mUpdaterService.getUpdaterController();
+                        if (controller.isInstallingUpdate() || 
+                            controller.isInstallingUpdate(update.getDownloadId())) {
+                            showSnackbar(R.string.already_installing, Snackbar.LENGTH_LONG);
+                            return;
+                        }
                         Utils.triggerUpdate(this, update.getDownloadId());
                     }
                 }
@@ -281,6 +319,42 @@ public class UpdatesActivity extends UpdatesListActivity implements UpdateImport
         }
 
         maybeShowWelcomeMessage();
+    }
+
+    private void resumeDownloadWithChecks(String downloadId) {
+        if (mUpdaterService == null) return;
+        
+        UpdateInfo update = mUpdaterService.getUpdaterController().getUpdate(downloadId);
+        if (update == null) return;
+        
+        File file = update.getFile();
+        File directory = file != null ? file.getParentFile() : null;
+        
+        // Verificar permisos y directorio
+        if (file == null || directory == null) {
+            showSnackbar(R.string.error_invalid_file_path, Snackbar.LENGTH_LONG);
+            return;
+        }
+        
+        // Crear directorio si no existe
+        if (!directory.exists() && !directory.mkdirs()) {
+            showSnackbar(R.string.error_creating_directory, Snackbar.LENGTH_LONG);
+            return;
+        }
+        
+        // Verificar permisos de escritura
+        if (!directory.canWrite()) {
+            showSnackbar(R.string.error_no_write_permission, Snackbar.LENGTH_LONG);
+            return;
+        }
+        
+        // Intentar reanudar
+        try {
+            mUpdaterService.getUpdaterController().resumeDownload(downloadId);
+        } catch (Exception e) {
+            Log.e(TAG, "Error resuming download", e);
+            showSnackbar(R.string.error_resuming_download, Snackbar.LENGTH_LONG);
+        }
     }
 
     private void updateLastCheckedView() {
@@ -444,6 +518,7 @@ public class UpdatesActivity extends UpdatesListActivity implements UpdateImport
         RelativeLayout downloadInfoContainer = findViewById(R.id.download_info_container);
         TextView downloadSpeedTextView = findViewById(R.id.download_speed);
         TextView downloadPercentageTextView = findViewById(R.id.download_percentage);
+        Button cancelButton = findViewById(R.id.cancel_button);
 
         switch (status) {
             case UNKNOWN:
@@ -452,6 +527,10 @@ public class UpdatesActivity extends UpdatesListActivity implements UpdateImport
                 mDownloadButton.setText(R.string.download);
                 mDownloadProgress.setVisibility(View.GONE);
                 mFabInstall.setVisibility(View.GONE);
+
+                if (cancelButton != null) {
+                    cancelButton.setVisibility(View.GONE);
+                }
                 break;
 
             case STARTING:
@@ -464,6 +543,11 @@ public class UpdatesActivity extends UpdatesListActivity implements UpdateImport
 
                 if (downloadInfoContainer != null) {
                     downloadInfoContainer.setVisibility(View.VISIBLE);
+                }
+
+                if (cancelButton != null) {
+                    cancelButton.setVisibility(View.VISIBLE);
+                    cancelButton.setText(R.string.cancel_download);
                 }
 
                 // Display current speed and percentage
@@ -479,6 +563,10 @@ public class UpdatesActivity extends UpdatesListActivity implements UpdateImport
                 mDownloadButton.setVisibility(View.GONE);
                 mDownloadProgress.setVisibility(View.GONE);
                 mFabInstall.setVisibility(View.VISIBLE);
+
+                if (cancelButton != null) {
+                    cancelButton.setVisibility(View.GONE);
+                }
                 break;
 
             case PAUSED:
@@ -490,6 +578,11 @@ public class UpdatesActivity extends UpdatesListActivity implements UpdateImport
 
                 if (downloadInfoContainer != null) {
                     downloadInfoContainer.setVisibility(View.VISIBLE);
+                }
+
+                if (cancelButton != null) {
+                    cancelButton.setVisibility(View.VISIBLE);
+                    cancelButton.setText(R.string.cancel_download);
                 }
 
                 // Display current speed and percentage (paused)
@@ -507,6 +600,9 @@ public class UpdatesActivity extends UpdatesListActivity implements UpdateImport
                 mDownloadButton.setText(R.string.retry_download);
                 mDownloadProgress.setVisibility(View.GONE);
                 mFabInstall.setVisibility(View.GONE);
+                if (cancelButton != null) {
+                    cancelButton.setVisibility(View.GONE);
+                }
                 break;
 
             case INSTALLING:
@@ -514,6 +610,9 @@ public class UpdatesActivity extends UpdatesListActivity implements UpdateImport
                 mDownloadProgress.setVisibility(View.VISIBLE);
                 mDownloadProgress.setIndeterminate(true);
                 mFabInstall.setVisibility(View.GONE);
+                if (cancelButton != null) {
+                    cancelButton.setVisibility(View.GONE);
+                }
                 break;
 
             case VERIFYING:
@@ -521,6 +620,10 @@ public class UpdatesActivity extends UpdatesListActivity implements UpdateImport
                 mDownloadProgress.setVisibility(View.VISIBLE);
                 mDownloadProgress.setIndeterminate(true);
                 mFabInstall.setVisibility(View.GONE);
+
+                if (cancelButton != null) {
+                    cancelButton.setVisibility(View.GONE);
+                }
                 break;
 
             case INSTALLED:
@@ -530,6 +633,12 @@ public class UpdatesActivity extends UpdatesListActivity implements UpdateImport
                 mDownloadButton.setVisibility(View.GONE);
                 mDownloadProgress.setVisibility(View.GONE);
                 mFabInstall.setVisibility(View.GONE);
+                if (downloadInfoContainer != null) {
+                    downloadInfoContainer.setVisibility(View.GONE);
+                }
+                if (cancelButton != null) {
+                    cancelButton.setVisibility(View.GONE);
+                }
                 break;
         }
     }
@@ -617,37 +726,65 @@ public class UpdatesActivity extends UpdatesListActivity implements UpdateImport
                 mDownloadButton.setText(R.string.pause_download);
             }
 
-        } else if (status == mx.xperience.updater.model.UpdateStatus.VERIFYING ||
-                status == mx.xperience.updater.model.UpdateStatus.INSTALLING) {
-            // Undetermined progress for verification/installation
+        } else if (status == mx.xperience.updater.model.UpdateStatus.VERIFYING) {
+            // VERIFICANDO
             mDownloadProgress.setVisibility(View.VISIBLE);
             mDownloadProgress.setIndeterminate(true);
-
-            // Hide download information during verification/installation
+            mDownloadButton.setVisibility(View.GONE);
+            mFabInstall.setVisibility(View.GONE);
+            
             if (downloadInfoContainer != null) {
-                downloadInfoContainer.setVisibility(View.GONE);
+                downloadInfoContainer.setVisibility(View.VISIBLE);
             }
-
-            // Update text (same as in the adapter)
-            if (status == mx.xperience.updater.model.UpdateStatus.VERIFYING) {
-                mDownloadButton.setText(R.string.list_verifying_update);
-
-                // Display verification progress if available
-                if (downloadPercentageTextView != null) {
-                    downloadPercentageTextView.setText(R.string.verifying);
-                }
-            } else {
-                mDownloadButton.setText(R.string.installing_update);
-
-                // Mostrar progreso de instalación
-                int installProgress = update.getInstallProgress();
-                if (downloadPercentageTextView != null) {
-                    downloadPercentageTextView.setText(NumberFormat.getPercentInstance()
-                            .format(installProgress / 100.f));
+            
+            if (downloadSpeedTextView != null) {
+                downloadSpeedTextView.setText(R.string.list_verifying_update);
+            }
+            if (downloadPercentageTextView != null) {
+                downloadPercentageTextView.setText("");
+            }
+            
+        } else if (status == mx.xperience.updater.model.UpdateStatus.INSTALLING) {
+            // INSTALANDO
+            mDownloadProgress.setVisibility(View.VISIBLE);
+            mDownloadButton.setVisibility(View.GONE);
+            mFabInstall.setVisibility(View.GONE);
+            
+            if (downloadInfoContainer != null) {
+                downloadInfoContainer.setVisibility(View.VISIBLE);
+            }
+            
+            // Get installation progress
+            int installProgress = update.getInstallProgress();
+            boolean isFinalizing = update.getFinalizing();
+            
+            // Update progress
+            mDownloadProgress.setIndeterminate(false);
+            mDownloadProgress.setProgress(installProgress);
+            
+            // Display messages as notifications
+            if (downloadSpeedTextView != null) {
+                if (mUpdaterService.getUpdaterController().isInstallingABUpdate()) {
+                    // For A/B updates
+                    if (isFinalizing) {
+                        downloadSpeedTextView.setText(R.string.finalizing_package);
+                    } else {
+                        downloadSpeedTextView.setText(R.string.preparing_ota_first_boot);
+                    }
+                } else {
+                    // For non-A/B updates
+                    downloadSpeedTextView.setText(R.string.dialog_prepare_zip_message);
                 }
             }
+            
+            // Display installation percentage
+            if (downloadPercentageTextView != null) {
+                String percentage = NumberFormat.getPercentInstance().format(installProgress / 100.f);
+                downloadPercentageTextView.setText(percentage);
+            }
+            
         } else {
-            // Ocultar información de descarga en otros estados
+            // Hide download information in other states
             if (downloadInfoContainer != null) {
                 downloadInfoContainer.setVisibility(View.GONE);
             }
@@ -666,8 +803,10 @@ public class UpdatesActivity extends UpdatesListActivity implements UpdateImport
     }
 
     private void handleDownloadButtonClick(UpdateInfo update) {
+        if (mUpdaterService == null) return;
+        
         UpdaterController controller = mUpdaterService.getUpdaterController();
-        mx.xperience.updater.model.UpdateStatus status = update.getStatus();
+        UpdateStatus status = update.getStatus();
 
         switch (status) {
             case UNKNOWN:
@@ -686,15 +825,50 @@ public class UpdatesActivity extends UpdatesListActivity implements UpdateImport
             case PAUSED:
             case PAUSED_ERROR:
                 // Resume download
-                controller.resumeDownload(update.getDownloadId());
+                try {
+                    File file = update.getFile();
+                    if (file == null || !file.exists()) {
+                        showFileDeletedDialog(update);
+                        return;
+                    }
+
+                    if (update.getFileSize() > 0 && file.length() == 0) {
+                       showFileCorruptedDialog(update);
+                        return;
+                    }
+
+                    controller.resumeDownload(update.getDownloadId());
+                } catch (Exception e) {
+                    Log.e(TAG, "Error al reanudar descarga", e);
+                    showSnackbar(R.string.error_resuming_download, Snackbar.LENGTH_LONG);
+
+                }
+                
                 break;
 
             case VERIFIED:
                 // Install update
-                Utils.triggerUpdate(this, update.getDownloadId());
+                if (mUpdaterService != null) {
+                    
+                    // Check whether an installation is already in progress
+                    if (controller.isInstallingUpdate()) {
+                        showSnackbar(R.string.already_installing, Snackbar.LENGTH_LONG);
+                        return;
+                    }
+                    
+                    // Check whether this specific update is already being installed.
+                    if (controller.isInstallingUpdate(update.getDownloadId())) {
+                        showSnackbar(R.string.update_already_installing, Snackbar.LENGTH_LONG);
+                        return;
+                    }
+                    
+                    Utils.triggerUpdate(this, update.getDownloadId());
+                }
                 break;
 
             case INSTALLING:
+                showCancelInstallationDialog();
+                break;
             case INSTALLED:
             case INSTALLATION_FAILED:
             case INSTALLATION_CANCELLED:
@@ -702,6 +876,65 @@ public class UpdatesActivity extends UpdatesListActivity implements UpdateImport
                 // These states do not require action from the download button.
                 break;
         }
+    }
+
+    private void showFileDeletedDialog(UpdateInfo update) {
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.file_deleted_title)
+                .setMessage(R.string.file_deleted_message)
+                .setPositiveButton(R.string.redownload, (dialog, which) -> {
+                    // Delete the update and download it again.
+                    mUpdaterService.getUpdaterController().deleteUpdate(update.getDownloadId());
+                    // Please wait a moment and try downloading again.
+                    new Handler().postDelayed(() -> {
+                        mUpdaterService.getUpdaterController().startDownload(update.getDownloadId());
+                    }, 500);
+                })
+                .setNegativeButton(R.string.cancel, null)
+                .show();
+    }
+
+    private void showFileCorruptedDialog(UpdateInfo update) {
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.file_corrupted_title)
+                .setMessage(R.string.file_corrupted_message)
+                .setPositiveButton(R.string.redownload, (dialog, which) -> {
+                    // Delete the update and download it again.
+                    mUpdaterService.getUpdaterController().deleteUpdate(update.getDownloadId());
+                    // Please wait a moment and try downloading again.
+                    new Handler().postDelayed(() -> {
+                        mUpdaterService.getUpdaterController().startDownload(update.getDownloadId());
+                    }, 500);
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
+    private void showCancelDownloadDialog(UpdateInfo update) {
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.cancel_download_title)
+                .setMessage(R.string.cancel_download_message)
+                .setPositiveButton(R.string.cancel_download, (dialog, which) -> {
+                    // Cancelar la descarga
+                    mUpdaterService.getUpdaterController().pauseDownload(update.getDownloadId());
+                    mUpdaterService.getUpdaterController().deleteUpdate(update.getDownloadId());
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
+    private void showCancelInstallationDialog() {
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.cancel_installation_title)
+                .setMessage(R.string.cancel_installation_message)
+                .setPositiveButton(R.string.cancel_installation, (dialog, which) -> {
+                    // Cancelar instalación
+                    Intent intent = new Intent(this, UpdaterService.class);
+                    intent.setAction(UpdaterService.ACTION_INSTALL_STOP);
+                    startService(intent);
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
     }
 
     private void showNoUpdatesView() {
@@ -1020,9 +1253,34 @@ public class UpdatesActivity extends UpdatesListActivity implements UpdateImport
             case VERIFIED:
                 showSnackbar(R.string.snack_download_verified, Snackbar.LENGTH_LONG);
                 break;
+            case INSTALLED:
+                showRebootDialog();
+                break;
+            case INSTALLATION_FAILED:
+                showSnackbar(R.string.installing_update_error, Snackbar.LENGTH_LONG);
+                break;
         }
 
         updateUIForCurrentUpdate();
+    }
+
+    private void showRebootDialog() {
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.install_complete_title)
+                .setMessage(R.string.install_complete_message)
+                .setPositiveButton(R.string.reboot, (dialog, which) -> {
+                    // Restart the device
+                    PowerManager pm = getSystemService(PowerManager.class);
+                    if (pm != null) {
+                        pm.reboot(null);
+                    }
+                })
+                .setNegativeButton(R.string.later, (dialog, which) -> {
+                    // The user wishes to restart later.
+                    dialog.dismiss();
+                })
+                .setCancelable(false) // The user must choose an option.
+                .show();
     }
 
     @Override

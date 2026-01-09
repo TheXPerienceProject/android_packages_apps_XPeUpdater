@@ -23,6 +23,8 @@
     <string name="changelog">Changelog</string>
     <string name="download">Download</string>
     <string name="cancel_download">Cancel Download</string>
+    <string name="cancel_installation">Cancelar instalación</string>
+    <string name="redownload">Volver a descargar</string>
     <string name="pause_download">Pause Download</string>
     <string name="resume_download">Resume Download</string>
     <string name="retry_download">Retry Download</string>
@@ -54,4 +56,34 @@
     </string>
 
     <string name="no_updates_message">Your system is up to date. Check back later for new updates.</string>
+
+
+    <!-- Diálogos de error -->
+    <!-- File deletion/corruption -->
+    <string name="file_deleted_title">File Deleted</string>
+    <string name="file_deleted_message">The download file was deleted. Would you like to download it again?</string>
+    <string name="file_corrupted_title">File Corrupted</string>
+    <string name="file_corrupted_message">The download file is corrupted or incomplete. Would you like to download it again?</string>
+
+    <!-- Cancel dialogs -->
+    <string name="cancel_download_title">Cancel Download</string>
+    <string name="cancel_download_message">Are you sure you want to cancel this download?</string>
+    <string name="cancel_installation_title">Cancel Installation</string>
+    <string name="cancel_installation_message">Are you sure you want to cancel the installation?</string>
+
+    <!-- Error messages -->
+    <string name="error_resuming_download">Error resuming download</string>
+    <string name="error_invalid_file_path">Invalid file path</string>
+    <string name="error_creating_directory">Error creating directory</string>
+    <string name="error_no_write_permission">No write permission</string>
+
+    <!-- Installation complete -->
+    <string name="install_complete_title">Installation Complete</string>
+    <string name="install_complete_message">The update has been installed successfully. Do you want to restart now?</string>
+    <string name="later">Later</string>
+
+    <string name="no_download_to_cancel">No download to cancel</string>
+    <string name="already_installing">Already installing an update</string>
+    <string name="update_already_installing">This update is already being installed</string>
+
 </resources>

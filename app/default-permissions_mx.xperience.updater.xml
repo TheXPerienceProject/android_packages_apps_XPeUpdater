@@ -19,8 +19,4 @@
         <!-- Notifications -->
         <permission name="android.permission.POST_NOTIFICATIONS" fixed="false"/>
     </exception>
-    <exception package="mx.xperience.updater">
-        <!-- Notifications -->
-        <permission name="android.permission.POST_NOTIFICATIONS" fixed="false"/>
-    </exception>
 </exceptions>

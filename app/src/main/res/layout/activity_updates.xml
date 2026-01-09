@@ -199,6 +199,17 @@
                             android:textSize="14sp"
                             android:textStyle="bold" />
 
+                        <Button
+                            android:id="@+id/cancel_button"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/cancel_download"
+                            android:background="@drawable/button_cancel_background"
+                            android:textColor="@android:color/white"
+                            android:textSize="12sp"
+                            android:layout_marginTop="8dp"
+                            android:visibility="gone" />
+
                         <TextView
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"

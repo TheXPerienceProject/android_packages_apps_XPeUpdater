@@ -48,4 +48,6 @@
     <color name="surface_container_light">#F7F2FA</color>
     <color name="outline_light">#79747E</color>
     <color name="primary_container_light">#EADDFF</color>
+    <color name="colorError">#FF4444</color>
+    <color name="colorErrorDark">#CC0000</color>
 </resources>
