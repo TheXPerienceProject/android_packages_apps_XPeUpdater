@@ -17,18 +17,18 @@
     <color name="md_theme_onSurface">@android:color/system_neutral1_100</color>
 
     <!-- Colores de Material 3 dinámicos -->
-    <color name="material_dynamic_primary40">#6750A4</color>
-    <color name="material_dynamic_primary90">#EADDFF</color>
-    <color name="material_dynamic_secondary40">#625B71</color>
-    <color name="material_dynamic_secondary90">#E8DEF8</color>
-    <color name="material_dynamic_neutral10">#1C1B1F</color>
+    <color name="material_dynamic_primary40">#5E1928</color>
+    <color name="material_dynamic_primary90">#FADADD</color>
+    <color name="material_dynamic_secondary40">#A25159</color>
+    <color name="material_dynamic_secondary90">#FFDADA</color>
+    <color name="material_dynamic_neutral10">#F5DDDA</color>
     <color name="material_dynamic_neutral95">#F5F5F5</color>
     <color name="material_dynamic_neutral_variant90">#E6E1E5</color>
 
     <!-- Colores básicos -->
-    <color name="colorPrimary">#6750A4</color>
-    <color name="colorPrimaryDark">#5A44A1</color>
-    <color name="colorAccent">#03DAC6</color>
+    <color name="colorPrimary">#5E1928</color>
+    <color name="colorPrimaryDark">#4A101B</color>
+    <color name="colorAccent">#A25159</color>
 
     <!-- Colores de fondo -->
     <color name="window_background">#FAFAFA</color>
@@ -40,7 +40,7 @@
     <color name="text_secondary">#49454F</color>
 
     <!-- Otros colores -->
-    <color name="primary_container">#EADDFF</color>
+    <color name="primary_container">#EB0012</color>
     <color name="outline">#79747E</color>
 
     <color name="surface_light">#FFFFFF</color>

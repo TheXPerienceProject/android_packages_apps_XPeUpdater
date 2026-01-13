@@ -25,6 +25,7 @@ import android.content.pm.PackageManager;
 import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
+import android.os.PowerManager;
 import android.os.SystemProperties;
 import android.os.storage.StorageManager;
 import android.util.Log;
@@ -420,6 +421,13 @@ public class Utils {
 
     public static boolean isUpdateCheckEnabled(Context context) {
         return getUpdateCheckSetting(context) != Constants.AUTO_UPDATES_CHECK_INTERVAL_NEVER;
+    }
+
+    public static void rebootDevice(Context context) {
+        PowerManager pm = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
+        if (pm != null) {
+            pm.reboot(null);
+        }
     }
 
     public static long getUpdateCheckInterval(Context context) {

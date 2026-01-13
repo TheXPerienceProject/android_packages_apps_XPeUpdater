@@ -86,4 +86,5 @@
     <string name="already_installing">Already installing an update</string>
     <string name="update_already_installing">This update is already being installed</string>
 
+    <string name="reboot_to_complete">Reboot to complete</string>
 </resources>

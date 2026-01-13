@@ -236,6 +236,14 @@ public class UpdatesActivity extends UpdatesListActivity implements UpdateImport
             public void onReceive(Context context, Intent intent) {
                 if (UpdaterController.ACTION_UPDATE_STATUS.equals(intent.getAction())) {
                     String downloadId = intent.getStringExtra(UpdaterController.EXTRA_DOWNLOAD_ID);
+                    if (downloadId != null && downloadId.equals(Update.LOCAL_ID)) {
+                        UpdateInfo update = mUpdaterService != null ? 
+                            mUpdaterService.getUpdaterController().getUpdate(downloadId) : null;
+                        
+                        if (update != null && update.getStatus() == UpdateStatus.INSTALLED) {
+                            showRebootDialog();
+                        }
+                    }
                     handleDownloadStatusChange(downloadId);
                     updateUIForCurrentUpdate(); // This will call updateButtonState
                 } else if (UpdaterController.ACTION_DOWNLOAD_PROGRESS.equals(intent.getAction())) {
@@ -627,6 +635,16 @@ public class UpdatesActivity extends UpdatesListActivity implements UpdateImport
                 break;
 
             case INSTALLED:
+                mDownloadButton.setVisibility(View.VISIBLE);
+                mDownloadButton.setText(R.string.reboot_to_complete);
+                mDownloadProgress.setVisibility(View.GONE);
+                mFabInstall.setVisibility(View.GONE);
+                
+                // reboot action
+                mDownloadButton.setOnClickListener(v -> {
+                    Utils.rebootDevice(this);
+                });
+                break;
             case INSTALLATION_FAILED:
             case INSTALLATION_CANCELLED:
             case INSTALLATION_SUSPENDED:
@@ -1068,17 +1086,78 @@ public class UpdatesActivity extends UpdatesListActivity implements UpdateImport
                 .deleteUpdate(update.getDownloadId());
 
         new AlertDialog.Builder(this)
-                .setTitle(R.string.local_update_import)
-                .setMessage(getString(R.string.local_update_import_success, update.getVersion()))
-                .setPositiveButton(R.string.local_update_import_install, (dialog, which) -> {
-                    mAdapter.addItem(update.getDownloadId());
-                    // Update UI
-                    getUpdatesList();
-                    Utils.triggerUpdate(this, update.getDownloadId());
-                })
-                .setNegativeButton(android.R.string.cancel, (dialog, which) -> deleteUpdate.run())
-                .setOnCancelListener((dialog) -> deleteUpdate.run())
-                .show();
+            .setTitle(R.string.local_update_import)
+            .setMessage(getString(R.string.local_update_import_success, update.getVersion()))
+            .setPositiveButton(R.string.local_update_import_install, (dialog, which) -> {
+                mAdapter.addItem(update.getDownloadId());
+                // Update UI
+                getUpdatesList();
+                
+                // Ocultar botón de descarga y mostrar progreso
+                if (mDownloadButton != null) {
+                    mDownloadButton.setVisibility(View.GONE);
+                }
+                if (mDownloadProgress != null) {
+                    mDownloadProgress.setVisibility(View.VISIBLE);
+                    mDownloadProgress.setIndeterminate(true);
+                }
+                
+                Utils.triggerUpdate(this, update.getDownloadId());
+                
+                // Comenzar a verificar estado de instalación
+                setupInstallationListener(update.getDownloadId());
+            })
+            .setNegativeButton(android.R.string.cancel, (dialog, which) -> {
+                // Solo eliminar si NO se ha comenzado a instalar
+                UpdaterController.getInstance(this).deleteUpdate(update.getDownloadId());
+                // Actualizar UI para mostrar que no hay actualizaciones
+                showNoUpdatesView();
+            })
+            .setOnCancelListener((dialog) -> {
+                UpdaterController.getInstance(this).deleteUpdate(update.getDownloadId());
+                showNoUpdatesView();
+            })
+            .show();
+    }
+
+    private void setupInstallationListener(String downloadId) {
+        Handler handler = new Handler();
+
+        final int MAX_CHECKS = 60;
+        final int[] checkCount = {0};
+
+        Runnable checkInstallationStatus = new Runnable() {
+            @Override
+            public void run() {
+                checkCount[0]++;
+                
+                if (checkCount[0] > MAX_CHECKS) {
+                    Log.w(TAG, "Timeout verificando estado de instalación");
+                    return;
+                }
+                
+                if (mUpdaterService != null) {
+                    UpdateInfo update = mUpdaterService.getUpdaterController().getUpdate(downloadId);
+                    if (update != null) {
+                        if (update.getStatus() == UpdateStatus.INSTALLED) {
+                            // Instalación completada
+                            showRebootDialog();
+                        } else if (update.getStatus() == UpdateStatus.INSTALLING) {
+                            // Seguir verificando cada 2 segundos
+                            handler.postDelayed(this, 2000);
+                        } else if (update.getStatus() == UpdateStatus.INSTALLATION_FAILED) {
+                            // Instalación falló
+                            showSnackbar(R.string.installing_update_error, Snackbar.LENGTH_LONG);
+                        }
+                    } else {
+                        Log.w(TAG, "Update no encontrado, deteniendo verificación");
+                    }
+                }
+            }
+        };
+        
+        // Comenzar a verificar después de 3 segundos
+        handler.postDelayed(checkInstallationStatus, 3000);
     }
 
     private final ServiceConnection mConnection = new ServiceConnection() {
@@ -1236,11 +1315,14 @@ public class UpdatesActivity extends UpdatesListActivity implements UpdateImport
     }*/
 
     private void handleDownloadStatusChange(String downloadId) {
-        if (Update.LOCAL_ID.equals(downloadId)) {
+        if (downloadId != null && downloadId.equals(Update.LOCAL_ID)) {
             return;
         }
 
+        if (mUpdaterService == null) return;
+
         UpdateInfo update = mUpdaterService.getUpdaterController().getUpdate(downloadId);
+        if (update == null) return;
         mx.xperience.updater.model.UpdateStatus status = update.getStatus();
 
         switch (status) {
