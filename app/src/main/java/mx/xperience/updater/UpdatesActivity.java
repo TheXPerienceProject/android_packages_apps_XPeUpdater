@@ -644,6 +644,9 @@ public class UpdatesActivity extends UpdatesListActivity implements UpdateImport
                 mDownloadButton.setOnClickListener(v -> {
                     Utils.rebootDevice(this);
                 });
+                if (cancelButton != null) {
+                    cancelButton.setVisibility(View.GONE);
+                }
                 break;
             case INSTALLATION_FAILED:
             case INSTALLATION_CANCELLED:
@@ -830,13 +833,13 @@ public class UpdatesActivity extends UpdatesListActivity implements UpdateImport
             case UNKNOWN:
             case DELETED:
             case VERIFICATION_FAILED:
-                // Iniciar descarga
+                // Start download
                 controller.startDownload(update.getDownloadId());
                 break;
 
             case STARTING:
             case DOWNLOADING:
-                // Pausar descarga
+                // Pause download
                 controller.pauseDownload(update.getDownloadId());
                 break;
 
@@ -857,7 +860,7 @@ public class UpdatesActivity extends UpdatesListActivity implements UpdateImport
 
                     controller.resumeDownload(update.getDownloadId());
                 } catch (Exception e) {
-                    Log.e(TAG, "Error al reanudar descarga", e);
+                    Log.e(TAG, "Error resuming download", e);
                     showSnackbar(R.string.error_resuming_download, Snackbar.LENGTH_LONG);
 
                 }
@@ -888,6 +891,7 @@ public class UpdatesActivity extends UpdatesListActivity implements UpdateImport
                 showCancelInstallationDialog();
                 break;
             case INSTALLED:
+                break;
             case INSTALLATION_FAILED:
             case INSTALLATION_CANCELLED:
             case INSTALLATION_SUSPENDED:
@@ -946,7 +950,7 @@ public class UpdatesActivity extends UpdatesListActivity implements UpdateImport
                 .setTitle(R.string.cancel_installation_title)
                 .setMessage(R.string.cancel_installation_message)
                 .setPositiveButton(R.string.cancel_installation, (dialog, which) -> {
-                    // Cancelar instalación
+                    // Cancel installation
                     Intent intent = new Intent(this, UpdaterService.class);
                     intent.setAction(UpdaterService.ACTION_INSTALL_STOP);
                     startService(intent);
@@ -1025,7 +1029,7 @@ public class UpdatesActivity extends UpdatesListActivity implements UpdateImport
             showPreferencesDialog();
             return true;
         } else if (itemId == R.id.menu_show_changelog) {
-            // Mostrar mensaje que ya se muestra en la app
+            // Display message already displayed in the app
             Toast.makeText(this, R.string.changelog_already_displayed, Toast.LENGTH_SHORT).show();
             return true;
         } else if (itemId == R.id.menu_local_update) {
@@ -1093,7 +1097,7 @@ public class UpdatesActivity extends UpdatesListActivity implements UpdateImport
                 // Update UI
                 getUpdatesList();
                 
-                // Ocultar botón de descarga y mostrar progreso
+                // Hide download button and show progress
                 if (mDownloadButton != null) {
                     mDownloadButton.setVisibility(View.GONE);
                 }
@@ -1104,13 +1108,13 @@ public class UpdatesActivity extends UpdatesListActivity implements UpdateImport
                 
                 Utils.triggerUpdate(this, update.getDownloadId());
                 
-                // Comenzar a verificar estado de instalación
+                // Start checking installation status
                 setupInstallationListener(update.getDownloadId());
             })
             .setNegativeButton(android.R.string.cancel, (dialog, which) -> {
-                // Solo eliminar si NO se ha comenzado a instalar
+                // Only delete if installation has NOT been started.
                 UpdaterController.getInstance(this).deleteUpdate(update.getDownloadId());
-                // Actualizar UI para mostrar que no hay actualizaciones
+                // Update UI to show that there are no updates
                 showNoUpdatesView();
             })
             .setOnCancelListener((dialog) -> {
@@ -1132,7 +1136,7 @@ public class UpdatesActivity extends UpdatesListActivity implements UpdateImport
                 checkCount[0]++;
                 
                 if (checkCount[0] > MAX_CHECKS) {
-                    Log.w(TAG, "Timeout verificando estado de instalación");
+                    Log.w(TAG, "Timeout checking installation status");
                     return;
                 }
                 
@@ -1140,23 +1144,23 @@ public class UpdatesActivity extends UpdatesListActivity implements UpdateImport
                     UpdateInfo update = mUpdaterService.getUpdaterController().getUpdate(downloadId);
                     if (update != null) {
                         if (update.getStatus() == UpdateStatus.INSTALLED) {
-                            // Instalación completada
+                            // Installation completed
                             showRebootDialog();
                         } else if (update.getStatus() == UpdateStatus.INSTALLING) {
-                            // Seguir verificando cada 2 segundos
+                            // Continue checking every 2 seconds
                             handler.postDelayed(this, 2000);
                         } else if (update.getStatus() == UpdateStatus.INSTALLATION_FAILED) {
-                            // Instalación falló
+                            // Installation failed
                             showSnackbar(R.string.installing_update_error, Snackbar.LENGTH_LONG);
                         }
                     } else {
-                        Log.w(TAG, "Update no encontrado, deteniendo verificación");
+                        Log.w(TAG, "Update not found, stopping verification");
                     }
                 }
             }
         };
         
-        // Comenzar a verificar después de 3 segundos
+        // Start checking after 3 seconds
         handler.postDelayed(checkInstallationStatus, 3000);
     }
 
@@ -1336,7 +1340,9 @@ public class UpdatesActivity extends UpdatesListActivity implements UpdateImport
                 showSnackbar(R.string.snack_download_verified, Snackbar.LENGTH_LONG);
                 break;
             case INSTALLED:
-                showRebootDialog();
+                if (!isFinishing() && !isDestroyed()) {
+                    showRebootDialog();
+                }
                 break;
             case INSTALLATION_FAILED:
                 showSnackbar(R.string.installing_update_error, Snackbar.LENGTH_LONG);
@@ -1358,10 +1364,18 @@ public class UpdatesActivity extends UpdatesListActivity implements UpdateImport
                     }
                 })
                 .setNegativeButton(R.string.later, (dialog, which) -> {
-                    // The user wishes to restart later.
-                    dialog.dismiss();
+                     if (mUpdaterService != null) {
+                        List<UpdateInfo> updates = mUpdaterService.getUpdaterController().getUpdates();
+                        if (!updates.isEmpty()) {
+                            updateUIForCurrentUpdate(); // This will update the button
+                        }
+                    }
                 })
                 .setCancelable(false) // The user must choose an option.
+                .setOnDismissListener(dialog -> {
+                    // Ensure that the UI is updated after the dialogue box is closed.
+                    updateUIForCurrentUpdate();
+                })
                 .show();
     }
 
