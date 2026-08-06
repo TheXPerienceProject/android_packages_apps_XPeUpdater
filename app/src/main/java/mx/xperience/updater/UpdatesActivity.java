@@ -242,7 +242,7 @@ public class UpdatesActivity extends UpdatesListActivity implements UpdateImport
                             mUpdaterService.getUpdaterController().getUpdate(downloadId) : null;
                         
                         if (update != null && update.getStatus() == UpdateStatus.INSTALLED) {
-                            clearUpdateAvailableSetting(context);
+                            setUpdateAvailableSetting(context, false);
                             showRebootDialog();
                         }
                     }
@@ -1249,6 +1249,7 @@ public class UpdatesActivity extends UpdatesListActivity implements UpdateImport
             if (json.exists() && Utils.isUpdateCheckEnabled(this) &&
                     Utils.checkForNewUpdates(json, jsonNew)) {
                 UpdatesCheckReceiver.updateRepeatingUpdatesCheck(this);
+                setUpdateAvailableSetting(this, true);
             }
             // In case we set a one-shot check because of a previous failure
             UpdatesCheckReceiver.cancelUpdatesCheck(this);
@@ -1360,11 +1361,11 @@ public class UpdatesActivity extends UpdatesListActivity implements UpdateImport
      * and pending reboot at this point, so there's nothing left to prompt the user about
      * from that card.
      */
-    private static void clearUpdateAvailableSetting(Context context) {
+    private static void setUpdateAvailableSetting(Context context, boolean available) {
         try {
-            Settings.Global.putInt(context.getContentResolver(), Constants.SETTING_XPE_UPDATE_AVAILABLE, 0);
+            Settings.Global.putInt(context.getContentResolver(), Constants.SETTING_XPE_UPDATE_AVAILABLE, available ? 1 : 0);
         } catch (SecurityException e) {
-            Log.e(TAG, "Missing WRITE_SECURE_SETTINGS, cannot clear update available flag", e);
+            Log.e(TAG, "Missing WRITE_SECURE_SETTINGS, cannot write update available flag", e);
         }
     }
 

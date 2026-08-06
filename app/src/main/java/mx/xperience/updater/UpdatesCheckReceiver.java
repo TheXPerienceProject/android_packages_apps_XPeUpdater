@@ -50,6 +50,8 @@ public class UpdatesCheckReceiver extends BroadcastReceiver {
     private static final String NEW_UPDATES_NOTIFICATION_CHANNEL =
             "new_updates_notification_channel";
 
+    private static final String SETTING_XPE_UPDATE_AVAILABLE = "xpe_update_available";
+
     @Override
     public void onReceive(final Context context, Intent intent) {
         if (Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction())) {
@@ -131,7 +133,7 @@ public class UpdatesCheckReceiver extends BroadcastReceiver {
     private static void setUpdateAvailableSetting(Context context, boolean available) {
         try {
             Settings.Global.putInt(context.getContentResolver(),
-                    Constants.SETTING_XPE_UPDATE_AVAILABLE, available ? 1 : 0);
+                    SETTING_XPE_UPDATE_AVAILABLE, available ? 1 : 0);
         } catch (SecurityException e) {
             Log.e(TAG, "Missing WRITE_SECURE_SETTINGS, cannot flag update available", e);
         }
