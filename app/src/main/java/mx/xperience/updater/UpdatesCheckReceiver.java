@@ -24,6 +24,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.SystemClock;
+import android.provider.Settings;
 import android.util.Log;
 
 import androidx.core.app.NotificationCompat;
@@ -93,6 +94,7 @@ public class UpdatesCheckReceiver extends BroadcastReceiver {
                     if (json.exists() && Utils.checkForNewUpdates(json, jsonNew)) {
                         showNotification(context);
                         updateRepeatingUpdatesCheck(context);
+                        setUpdateAvailableSetting(context, true);
                     }
                     //noinspection ResultOfMethodCallIgnored
                     jsonNew.renameTo(json);
@@ -119,6 +121,19 @@ public class UpdatesCheckReceiver extends BroadcastReceiver {
         } catch (IOException e) {
             Log.e(TAG, "Could not fetch list, scheduling new check", e);
             scheduleUpdatesCheck(context);
+        }
+    }
+
+    /**
+     * Writes the Settings.Global used by MyDeviceInfoFragment (com.android.settings)
+     * to display the “update available” card in About Phone.
+     */
+    private static void setUpdateAvailableSetting(Context context, boolean available) {
+        try {
+            Settings.Global.putInt(context.getContentResolver(),
+                    Constants.SETTING_XPE_UPDATE_AVAILABLE, available ? 1 : 0);
+        } catch (SecurityException e) {
+            Log.e(TAG, "Missing WRITE_SECURE_SETTINGS, cannot flag update available", e);
         }
     }
 

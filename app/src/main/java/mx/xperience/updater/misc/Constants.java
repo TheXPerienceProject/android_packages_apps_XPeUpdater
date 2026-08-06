@@ -60,4 +60,8 @@ public final class Constants {
 
     public static final String HAS_SEEN_INFO_DIALOG = "has_seen_info_dialog";
     public static final String HAS_SEEN_WELCOME_MESSAGE = "has_seen_welcome_message";
+
+    // Contract with com.android.settings: MyDeviceInfoFragment reads this key
+    // to display the “update available” card in About Phone.
+    public static final String SETTING_XPE_UPDATE_AVAILABLE = "xpe_update_available";
 }

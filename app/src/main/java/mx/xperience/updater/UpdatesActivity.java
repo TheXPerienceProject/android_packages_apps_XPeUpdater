@@ -36,6 +36,7 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.PowerManager;
 import android.os.SystemProperties;
+import android.provider.Settings;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.Menu;
@@ -241,6 +242,7 @@ public class UpdatesActivity extends UpdatesListActivity implements UpdateImport
                             mUpdaterService.getUpdaterController().getUpdate(downloadId) : null;
                         
                         if (update != null && update.getStatus() == UpdateStatus.INSTALLED) {
+                            clearUpdateAvailableSetting(context);
                             showRebootDialog();
                         }
                     }
@@ -1350,6 +1352,20 @@ public class UpdatesActivity extends UpdatesListActivity implements UpdateImport
         }
 
         updateUIForCurrentUpdate();
+    }
+
+    /**
+     * Clears the Settings.Global that MyDeviceInfoFragment (com.android.settings) reads
+     * to show the "update available" card in About Phone. The update is already installed
+     * and pending reboot at this point, so there's nothing left to prompt the user about
+     * from that card.
+     */
+    private static void clearUpdateAvailableSetting(Context context) {
+        try {
+            Settings.Global.putInt(context.getContentResolver(), Constants.SETTING_XPE_UPDATE_AVAILABLE, 0);
+        } catch (SecurityException e) {
+            Log.e(TAG, "Missing WRITE_SECURE_SETTINGS, cannot clear update available flag", e);
+        }
     }
 
     private void showRebootDialog() {
