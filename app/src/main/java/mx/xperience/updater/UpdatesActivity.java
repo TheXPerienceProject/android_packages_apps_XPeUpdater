@@ -1250,6 +1250,8 @@ public class UpdatesActivity extends UpdatesListActivity implements UpdateImport
                     Utils.checkForNewUpdates(json, jsonNew)) {
                 UpdatesCheckReceiver.updateRepeatingUpdatesCheck(this);
                 setUpdateAvailableSetting(this, true);
+            } else {
+                setUpdateAvailableSetting(this, false);
             }
             // In case we set a one-shot check because of a previous failure
             UpdatesCheckReceiver.cancelUpdatesCheck(this);
@@ -1364,6 +1366,10 @@ public class UpdatesActivity extends UpdatesListActivity implements UpdateImport
     private static void setUpdateAvailableSetting(Context context, boolean available) {
         try {
             Settings.Global.putInt(context.getContentResolver(), Constants.SETTING_XPE_UPDATE_AVAILABLE, available ? 1 : 0);
+            context.getContentResolver().notifyChange(
+                    Settings.Global.getUriFor(Constants.SETTING_XPE_UPDATE_AVAILABLE),
+                    null
+            );
         } catch (SecurityException e) {
             Log.e(TAG, "Missing WRITE_SECURE_SETTINGS, cannot write update available flag", e);
         }
