@@ -87,4 +87,18 @@
     <string name="update_already_installing">This update is already being installed</string>
 
     <string name="reboot_to_complete">Reboot to complete</string>
+
+    <string name="update_status_ready_title">Package ready to install</string>
+    <string name="update_status_ready_subtitle">Verified · A/B installation</string>
+    <string name="update_status_installing_title">Installing update</string>
+    <string name="update_status_installing_subtitle">You can keep using your device</string>
+    <string name="update_status_installed_title">Update installed</string>
+    <string name="update_status_installed_subtitle">Restart pending</string>
+    <string name="last_checked_never">Last checked: Never</string>
+    <string name="changelog_view_all">View all</string>
+    <string name="changelog_full_subtitle">XPerience %1$s · full changelog</string>
+    <string name="check_for_updates">Check for updates</string>
+    <string name="ota_incremental">⚡ Incremental</string>
+    <string name="ota_incremental_savings">⚡ Incremental · saves %1$s</string>
+    <string name="xperience_brand" translatable="false">XPerience</string>
 </resources>

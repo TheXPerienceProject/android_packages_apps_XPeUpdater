@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="update_status_ready_title">Paquete listo para instalar</string>
+    <string name="update_status_ready_subtitle">Verificado · instalación A/B</string>
+    <string name="update_status_installing_title">Instalando actualización</string>
+    <string name="update_status_installing_subtitle">Puedes seguir usando el dispositivo</string>
+    <string name="update_status_installed_title">Actualización instalada</string>
+    <string name="update_status_installed_subtitle">Reinicio pendiente</string>
+    <string name="last_checked_never">Última comprobación: Nunca</string>
+    <string name="changelog_view_all">Ver todo</string>
+    <string name="changelog_full_subtitle">XPerience %1$s · registro completo</string>
+    <string name="check_for_updates">Buscar actualizaciones</string>
+    <string name="ota_incremental">⚡ Incremental</string>
+    <string name="ota_incremental_savings">⚡ Incremental · ahorras %1$s</string>
+</resources>

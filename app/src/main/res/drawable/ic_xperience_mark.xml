@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    SPDX-FileCopyrightText: 2026 The XPerience Project
+    SPDX-License-Identifier: Apache-2.0
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="160dp"
+    android:height="180dp"
+    android:viewportWidth="160"
+    android:viewportHeight="180">
+
+    <!-- Back ribbon: one clean diagonal blade from upper-right to lower-left. -->
+    <path
+        android:fillColor="#FFD91655"
+        android:pathData="M114,18 L151,18 L47,162 L10,162 Z" />
+
+    <!-- Brighter upper face of the back ribbon. -->
+    <path
+        android:fillColor="#FFFF315F"
+        android:pathData="M114,18 L151,18 L101,87 L82,62 Z" />
+
+    <!-- Front ribbon, split into three faces to create the folded X look. -->
+    <path
+        android:fillColor="#FFFF5F86"
+        android:pathData="M9,18 L45,18 L82,71 L64,97 Z" />
+
+    <path
+        android:fillColor="#FFF23B68"
+        android:pathData="M64,97 L82,71 L100,97 L82,123 Z" />
+
+    <path
+        android:fillColor="#FFE81753"
+        android:pathData="M82,123 L100,97 L151,162 L115,162 Z" />
+
+    <!-- Small specular edge on the fold; deliberately subtle. -->
+    <path
+        android:fillColor="#26FFFFFF"
+        android:pathData="M78,76 L84,68 L102,94 L97,101 Z" />
+</vector>

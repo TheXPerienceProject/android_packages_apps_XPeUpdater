@@ -339,6 +339,8 @@ public class UpdaterController {
                 Update updateAdded = entry.mUpdate;
                 updateAdded.setAvailableOnline(availableOnline && updateAdded.getAvailableOnline());
                 updateAdded.setDownloadUrl(updateInfo.getDownloadUrl());
+                updateAdded.setIncremental(updateInfo.isIncremental());
+                updateAdded.setFullFileSize(updateInfo.getFullFileSize());
             }
             return false;
         }

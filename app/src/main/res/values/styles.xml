@@ -12,7 +12,11 @@
         <item name="colorAccent">@color/colorAccent</item>
 
         <!-- Colores dinámicos que cambian con el tema -->
-        <item name="android:windowBackground">?android:attr/colorBackground</item>
+        <item name="android:windowBackground">@color/updater_screen_background</item>
+        <item name="android:statusBarColor">@color/updater_top_bar</item>
+        <item name="android:navigationBarColor">@color/updater_screen_background</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">@bool/updater_light_navigation_bar</item>
 
         <!-- Colores para modo claro/oscuro -->
         <item name="colorSurface">@color/surface_light</item>

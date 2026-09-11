@@ -29,4 +29,8 @@ public interface UpdateBaseInfo {
     String getDownloadUrl();
 
     long getFileSize();
+
+    boolean isIncremental();
+
+    long getFullFileSize();
 }

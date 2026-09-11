@@ -25,6 +25,7 @@ import android.content.pm.PackageManager;
 import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
+import android.os.Build;
 import android.os.PowerManager;
 import android.os.SystemProperties;
 import android.os.storage.StorageManager;
@@ -72,17 +73,122 @@ public class Utils {
     }
 
     // This should really return an UpdateBaseInfo object, but currently this only
-    // used to initialize UpdateInfo objects
+    // used to initialize UpdateInfo objects.
+    //
+    // The regular fields always describe the full OTA. An optional incremental
+    // object (or entry in incrementals[]) may override the active package only
+    // when its source build matches this device exactly. The full OTA remains the
+    // fallback for every other installed build.
     private static UpdateInfo parseJsonUpdate(JSONObject object) throws JSONException {
         Update update = new Update();
         update.setTimestamp(object.getLong("fileTimestamp"));
         update.setName(object.getString("file"));
         update.setDownloadId(object.getString("filemd5"));
         update.setFileSize(object.getLong("filesize"));
+        update.setFullFileSize(update.getFileSize());
         update.setType(object.getString("romtype"));
         update.setDownloadUrl(object.getString("filelink"));
         update.setVersion(object.getString("version"));
+        update.setIncremental(false);
+
+        JSONObject incremental = findCompatibleIncremental(object);
+        if (incremental != null) {
+            try {
+                update.setName(incremental.getString("file"));
+                update.setDownloadId(getPackageId(incremental));
+                update.setFileSize(incremental.getLong("filesize"));
+                update.setDownloadUrl(incremental.getString("filelink"));
+                update.setIncremental(true);
+                Log.i(TAG, "Using incremental OTA " + update.getName()
+                        + " for installed build "
+                        + SystemProperties.get(Constants.PROP_BUILD_VERSION_INCREMENTAL));
+            } catch (JSONException e) {
+                Log.e(TAG, "Incremental OTA metadata is incomplete; falling back to full OTA", e);
+                update.setName(object.getString("file"));
+                update.setDownloadId(object.getString("filemd5"));
+                update.setFileSize(object.getLong("filesize"));
+                update.setDownloadUrl(object.getString("filelink"));
+                update.setIncremental(false);
+            }
+        }
         return update;
+    }
+
+    private static JSONObject findCompatibleIncremental(JSONObject update) {
+        Object single = update.opt("incremental");
+        if (single instanceof JSONObject && isIncrementalCompatible((JSONObject) single)) {
+            return (JSONObject) single;
+        }
+        if (single instanceof JSONArray) {
+            JSONObject match = findCompatibleIncremental((JSONArray) single);
+            if (match != null) {
+                return match;
+            }
+        }
+
+        JSONArray incrementals = update.optJSONArray("incrementals");
+        return incrementals != null ? findCompatibleIncremental(incrementals) : null;
+    }
+
+    private static JSONObject findCompatibleIncremental(JSONArray incrementals) {
+        for (int i = 0; i < incrementals.length(); i++) {
+            JSONObject candidate = incrementals.optJSONObject(i);
+            if (candidate != null && isIncrementalCompatible(candidate)) {
+                return candidate;
+            }
+        }
+        return null;
+    }
+
+    private static boolean isIncrementalCompatible(JSONObject incremental) {
+        String expectedFingerprint = optString(incremental,
+                "preBuild", "pre-build", "pre_build", "sourceFingerprint");
+        String expectedIncremental = optString(incremental,
+                "preBuildIncremental", "pre-build-incremental",
+                "pre_build_incremental", "sourceIncremental");
+
+        // Never guess. An incremental OTA is only safe when the JSON identifies
+        // its source build with at least one exact build identity.
+        if (expectedFingerprint.isEmpty() && expectedIncremental.isEmpty()) {
+            Log.w(TAG, "Ignoring incremental OTA without source build metadata");
+            return false;
+        }
+
+        if (!expectedFingerprint.isEmpty() && !expectedFingerprint.equals(Build.FINGERPRINT)) {
+            Log.d(TAG, "Incremental fingerprint mismatch: expected "
+                    + expectedFingerprint + ", device is " + Build.FINGERPRINT);
+            return false;
+        }
+
+        String currentIncremental = SystemProperties.get(Constants.PROP_BUILD_VERSION_INCREMENTAL);
+        if (!expectedIncremental.isEmpty() && !expectedIncremental.equals(currentIncremental)) {
+            Log.d(TAG, "Incremental build mismatch: expected "
+                    + expectedIncremental + ", device is " + currentIncremental);
+            return false;
+        }
+
+        return true;
+    }
+
+    private static String getPackageId(JSONObject object) throws JSONException {
+        String id = object.optString("filemd5", "").trim();
+        if (id.isEmpty()) {
+            id = object.optString("id", "").trim();
+        }
+        if (id.isEmpty()) {
+            throw new JSONException("Missing incremental filemd5/id");
+        }
+        return id;
+    }
+
+    private static String optString(JSONObject object, String... keys) {
+        for (String key : keys) {
+            String value = object.optString(key, "").trim();
+            if (!value.isEmpty()) {
+                return value;
+            }
+        }
+        return "";
     }
 
     public static boolean isCompatible(UpdateBaseInfo update) {

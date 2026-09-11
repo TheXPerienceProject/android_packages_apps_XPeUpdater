@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    SPDX-FileCopyrightText: 2026 The XPerience Project
+    SPDX-License-Identifier: Apache-2.0
+-->
+<resources>
+    <!-- App chrome -->
+    <color name="updater_top_bar">#101018</color>
+    <color name="updater_toolbar_content">#FFFFFFFF</color>
+
+    <!-- Adaptive light-theme surfaces. Night overrides live in values-night/. -->
+    <color name="updater_screen_background">#F7F7FA</color>
+    <color name="updater_surface_card">#FFFFFFFF</color>
+    <color name="updater_surface_card_stroke">#1A000000</color>
+    <color name="updater_sheet_surface">#FFFFFFFF</color>
+    <color name="updater_sheet_handle">#42000000</color>
+    <color name="updater_divider">#1F000000</color>
+    <color name="updater_support_icon_bg">#1FFF5F86</color>
+    <color name="updater_system_ready_shield">#FFFF5F86</color>
+    <color name="updater_system_ready_check">#FFFFFFFF</color>
+
+    <!-- Hero stays XPerience dark in both themes -->
+    <color name="updater_hero_start">#18090F</color>
+    <color name="updater_hero_center">#5C1226</color>
+    <color name="updater_hero_end">#12060C</color>
+    <color name="updater_hero_on_surface">#FFF8F8</color>
+    <color name="updater_hero_on_surface_variant">#E5C5CC</color>
+    <color name="updater_hero_accent">#FF5F86</color>
+    <color name="updater_hero_accent_secondary">#FF839F</color>
+    <color name="updater_hero_chip">#26FFFFFF</color>
+    <color name="updater_hero_chip_text">#FFF2F5</color>
+    <color name="updater_hero_chip_stroke">#3DFFD0DA</color>
+    <color name="updater_hero_progress_track">#33FFFFFF</color>
+    <color name="updater_hero_divider">#29FFFFFF</color>
+</resources>

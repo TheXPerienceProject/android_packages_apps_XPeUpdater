@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Deep near-black instead of the old neutral gray background -->
+    <color name="updater_screen_background">#0B0B10</color>
+    <color name="updater_surface_card">#151521</color>
+    <color name="updater_surface_card_stroke">#1FFFFFFF</color>
+    <color name="updater_sheet_surface">#14141F</color>
+    <color name="updater_sheet_handle">#55FFFFFF</color>
+    <color name="updater_divider">#29FFFFFF</color>
+    <color name="updater_support_icon_bg">#22FF6B86</color>
+    <color name="updater_system_ready_shield">#FFFFF2F5</color>
+    <color name="updater_system_ready_check">#FFFF5F86</color>
+</resources>

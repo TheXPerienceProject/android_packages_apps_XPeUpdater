@@ -36,6 +36,11 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.PowerManager;
 import android.os.SystemProperties;
+import android.graphics.Typeface;
+import android.text.SpannableStringBuilder;
+import android.text.Spanned;
+import android.text.style.ForegroundColorSpan;
+import android.text.style.StyleSpan;
 import android.provider.Settings;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -45,8 +50,10 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.animation.Animation;
 import android.view.animation.LinearInterpolator;
+import android.view.animation.PathInterpolator;
 import android.view.animation.RotateAnimation;
 import android.widget.Button;
+import android.widget.ImageButton;
 import android.widget.RelativeLayout;
 import android.widget.Spinner;
 import android.widget.TextView;
@@ -66,6 +73,8 @@ import androidx.recyclerview.widget.RecyclerView;
 import androidx.recyclerview.widget.SimpleItemAnimator;
 
 import com.google.android.material.appbar.AppBarLayout;
+import com.google.android.material.bottomsheet.BottomSheetBehavior;
+import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.snackbar.Snackbar;
 
 import org.json.JSONException;
@@ -131,16 +140,24 @@ public class UpdatesActivity extends UpdatesListActivity implements UpdateImport
     private TextView mUpdateDate;
     private TextView mUpdateVersion;
     private TextView mUpdateSize;
+    private TextView mIncrementalInfo;
     private TextView mChangelogText;
     /*private TextView mGrupSupport;*/
+    private TextView mRomVersion;
     private TextView mSystemInfo;
+    private TextView mDeviceCodename;
     private TextView mLastCheck;
     private TextView mNoUpdatesTitle;
     private TextView mNoUpdatesMessage;
     private android.widget.Button  mCheckForUpdatesButton;
     private android.widget.ProgressBar mDownloadProgress;
     private android.widget.Button mDownloadButton;
-    private android.widget.ImageButton mFabInstall;
+    private TextView mChangelogViewAll;
+    private BottomSheetDialog mChangelogDialog;
+    private View mUpdateStatusCard;
+    private TextView mUpdateStatusTitle;
+    private TextView mUpdateStatusSubtitle;
+    private String mFullChangelog = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -166,16 +183,22 @@ public class UpdatesActivity extends UpdatesListActivity implements UpdateImport
         mUpdateDate = findViewById(R.id.update_date);
         mUpdateVersion = findViewById(R.id.update_version);
         mUpdateSize = findViewById(R.id.update_size);
+        mIncrementalInfo = findViewById(R.id.incremental_info);
         mChangelogText = findViewById(R.id.changelog_text);
         /*mGrupSupport = findViewById(R.id.grup_support);*/
         mDownloadProgress = findViewById(R.id.download_progress);
         mDownloadButton = findViewById(R.id.download_button);
-        mFabInstall = findViewById(R.id.fab_install);
+        mChangelogViewAll = findViewById(R.id.changelog_view_all);
+        mRomVersion = findViewById(R.id.rom_version);
         mSystemInfo = findViewById(R.id.system_info);
+        mDeviceCodename = findViewById(R.id.device_codename);
         mLastCheck = findViewById(R.id.last_check);
         mNoUpdatesTitle = findViewById(R.id.no_updates_title);
         mNoUpdatesMessage = findViewById(R.id.no_updates_message);
         mCheckForUpdatesButton = findViewById(R.id.check_for_updates_button);
+        mUpdateStatusCard = findViewById(R.id.update_status_card);
+        mUpdateStatusTitle = findViewById(R.id.update_status_title);
+        mUpdateStatusSubtitle = findViewById(R.id.update_status_subtitle);
 
         // Configure initial views
         if (mUpdateTitle != null) {
@@ -191,18 +214,25 @@ public class UpdatesActivity extends UpdatesListActivity implements UpdateImport
             mDownloadProgress.setVisibility(View.GONE);
         }
 
-        if (mFabInstall != null) {
-            mFabInstall.setVisibility(View.GONE);
-        }
-
         // Hide changelog_container initially
         View changelogContainer = findViewById(R.id.changelog_container);
         if (changelogContainer != null) {
             changelogContainer.setVisibility(View.GONE);
         }
 
+        if (mRomVersion != null) {
+            String xperienceVersion = getCurrentXperienceMajorVersion();
+            mRomVersion.setText(xperienceVersion.isEmpty()
+                    ? getString(R.string.xperience_brand)
+                    : getString(R.string.list_build_version, xperienceVersion));
+        }
+
         if (mSystemInfo != null) {
             mSystemInfo.setText(getString(R.string.header_android_version, Build.VERSION.RELEASE));
+        }
+
+        if (mDeviceCodename != null) {
+            mDeviceCodename.setText(getCurrentDeviceCodename());
         }
 
         // Update the last check-up:
@@ -213,6 +243,10 @@ public class UpdatesActivity extends UpdatesListActivity implements UpdateImport
             mCheckForUpdatesButton.setOnClickListener(v -> {
                 downloadUpdatesList(true);
             });
+        }
+
+        if (mChangelogViewAll != null) {
+            mChangelogViewAll.setOnClickListener(v -> showChangelogBottomSheet());
         }
 
         if (getSupportActionBar() != null) {
@@ -310,24 +344,6 @@ public class UpdatesActivity extends UpdatesListActivity implements UpdateImport
             });
         }
 
-        if (mFabInstall != null) {
-            mFabInstall.setOnClickListener(v -> {
-                if (mUpdaterService != null) {
-                    List<UpdateInfo> updates = mUpdaterService.getUpdaterController().getUpdates();
-                    if (!updates.isEmpty()) {
-                        UpdateInfo update = updates.get(0);
-                        UpdaterController controller = mUpdaterService.getUpdaterController();
-                        if (controller.isInstallingUpdate() || 
-                            controller.isInstallingUpdate(update.getDownloadId())) {
-                            showSnackbar(R.string.already_installing, Snackbar.LENGTH_LONG);
-                            return;
-                        }
-                        Utils.triggerUpdate(this, update.getDownloadId());
-                    }
-                }
-            });
-        }
-
         maybeShowWelcomeMessage();
     }
 
@@ -367,6 +383,28 @@ public class UpdatesActivity extends UpdatesListActivity implements UpdateImport
         }
     }
 
+    private String getCurrentXperienceMajorVersion() {
+        String version = BuildInfoUtils.getBuildVersion();
+        if (version == null) return "";
+        version = version.trim();
+        if (version.isEmpty()) return "";
+
+        java.util.regex.Matcher matcher = java.util.regex.Pattern.compile("(\\d+)")
+                .matcher(version);
+        return matcher.find() ? matcher.group(1) : version;
+    }
+
+    private String getCurrentDeviceCodename() {
+        String device = SystemProperties.get(Constants.PROP_NEXT_DEVICE);
+        if (device == null || device.trim().isEmpty()) {
+            device = SystemProperties.get(Constants.PROP_DEVICE);
+        }
+        if (device == null || device.trim().isEmpty()) {
+            device = Build.DEVICE;
+        }
+        return device;
+    }
+
     private void updateLastCheckedView() {
         if (mLastCheck != null) {
             SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(this);
@@ -378,7 +416,7 @@ public class UpdatesActivity extends UpdatesListActivity implements UpdateImport
                         StringGenerator.getDateLocalized(this, DateFormat.LONG, lastCheck),
                         StringGenerator.getTimeLocalized(this, lastCheck));
             } else {
-                lastCheckString = "Last checked: Never";
+                lastCheckString = getString(R.string.last_checked_never);
             }
 
             mLastCheck.setText(lastCheckString);
@@ -412,12 +450,35 @@ public class UpdatesActivity extends UpdatesListActivity implements UpdateImport
 
         long size = update.getFileSize();
         mUpdateSize.setText(android.text.format.Formatter.formatShortFileSize(this, size));
+        updatePackageTypeInfo(update);
 
         // Update button status according to download status
         updateButtonState(update);
 
         // Load changelog for this update
         loadChangelogForUpdate(update);
+    }
+
+    private void updatePackageTypeInfo(UpdateInfo update) {
+        if (mIncrementalInfo == null) {
+            return;
+        }
+
+        if (!update.isIncremental()) {
+            mIncrementalInfo.setVisibility(View.GONE);
+            return;
+        }
+
+        long fullSize = update.getFullFileSize();
+        long incrementalSize = update.getFileSize();
+        if (fullSize > incrementalSize && incrementalSize > 0) {
+            long savedBytes = fullSize - incrementalSize;
+            String saved = android.text.format.Formatter.formatShortFileSize(this, savedBytes);
+            mIncrementalInfo.setText(getString(R.string.ota_incremental_savings, saved));
+        } else {
+            mIncrementalInfo.setText(R.string.ota_incremental);
+        }
+        mIncrementalInfo.setVisibility(View.VISIBLE);
     }
 
     private void loadChangelogForUpdate(UpdateInfo update) {
@@ -471,96 +532,195 @@ public class UpdatesActivity extends UpdatesListActivity implements UpdateImport
 
         @Override
         protected void onPostExecute(String changelog) {
-            mChangelogText.setText(changelog);
+            mFullChangelog = changelog != null ? changelog : "";
+            if (mChangelogText != null) {
+                mChangelogText.setText(styleChangelog(mFullChangelog));
+            }
         }
 
         private String formatChangelog(String rawChangelog) {
-            // Format the changelog so that it looks nice.
             StringBuilder formatted = new StringBuilder();
             String[] lines = rawChangelog.split("\n");
 
-            for (String line : lines) {
-                line = line.trim();
-
+            for (String rawLine : lines) {
+                String line = rawLine.trim();
                 if (line.isEmpty()) {
                     continue;
                 }
 
-                // Detect dates in DD-MMM-YYYY format or similar
-                if (line.matches(".*\\d{1,2}-[A-Za-z]{3}-\\d{4}.*") ||
-                    line.matches(".*\\d{4}-\\d{2}-\\d{2}.*")) {
-                    formatted.append("\n📅 ");
-                    formatted.append(line);
-                    formatted.append("\n━━━━━━━━━━━━━━━━━━━━\n");
+                // Strip markdown/bullet noise repeatedly so entries like "- -" disappear.
+                line = line.replaceFirst("^[•◦°*\\-]+\\s*", "").trim();
+                if (line.isEmpty() || line.equals("-") || line.equals("—")) {
+                    continue;
                 }
-                // Detect items with different types of bullet points
-                else if (line.startsWith("•") || line.startsWith("*") || line.startsWith("-")) {
-                    String cleanLine = line.substring(1).trim();
-                    formatted.append("   ◦ ");
-                    formatted.append(cleanLine);
-                    formatted.append("\n");
-                }
-                // Titles or headings
-                else if (line.contains(":") && !line.startsWith(" ") && line.length() < 50) {
-                    formatted.append("\n🔹 ");
-                    formatted.append(line);
-                    formatted.append("\n");
-                }
-                // Texto normal
-                else {
-                    formatted.append(line);
-                    formatted.append("\n");
+
+                boolean category = line.contains("Apps & UI")
+                        || line.contains("Fixes & improvements")
+                        || line.contains("Other changes");
+
+                if (category) {
+                    if (formatted.length() > 0) {
+                        formatted.append("\n");
+                    }
+                    formatted.append(line).append("\n");
+                } else if (line.matches(".*\\d{1,2}-[A-Za-z]{3}-\\d{4}.*")
+                        || line.matches(".*\\d{4}-\\d{2}-\\d{2}.*")) {
+                    formatted.append(line).append("\n");
+                } else if (line.startsWith("XPerience ")
+                        || line.matches("\\d{8}\\s*→\\s*\\d{8}")) {
+                    formatted.append(line).append("\n");
+                } else {
+                    formatted.append("• ").append(line).append("\n");
                 }
             }
 
-            // If there is no formatted content, display the raw content.
-            if (formatted.length() == 0) {
-                return rawChangelog;
-            }
-
-            return formatted.toString().trim();
+            String result = formatted.toString().trim();
+            return result.isEmpty() ? rawChangelog.trim() : result;
         }
     }
 
+    private CharSequence styleChangelog(String changelog) {
+        SpannableStringBuilder styled = new SpannableStringBuilder(changelog != null ? changelog : "");
+        int accent = getColor(R.color.updater_hero_accent);
+        String text = styled.toString();
+        int lineStart = 0;
+
+        while (lineStart < text.length()) {
+            int lineEnd = text.indexOf('\n', lineStart);
+            if (lineEnd < 0) lineEnd = text.length();
+            String line = text.substring(lineStart, lineEnd).trim();
+
+            boolean category = line.contains("Apps & UI")
+                    || line.contains("Fixes & improvements")
+                    || line.contains("Other changes");
+            boolean title = line.startsWith("XPerience ");
+
+            if (category || title) {
+                styled.setSpan(new StyleSpan(Typeface.BOLD), lineStart, lineEnd,
+                        Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            }
+            if (category) {
+                styled.setSpan(new ForegroundColorSpan(accent), lineStart, lineEnd,
+                        Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            }
+
+            lineStart = lineEnd + 1;
+        }
+        return styled;
+    }
+
+    private void showChangelogBottomSheet() {
+        if (mChangelogDialog != null && mChangelogDialog.isShowing()) {
+            return;
+        }
+
+        View content = getLayoutInflater().inflate(R.layout.bottom_sheet_changelog, null);
+        TextView fullChangelog = content.findViewById(R.id.bottom_sheet_changelog_text);
+        TextView subtitle = content.findViewById(R.id.bottom_sheet_changelog_subtitle);
+        ImageButton closeButton = content.findViewById(R.id.bottom_sheet_close);
+
+        String xperienceVersion = getCurrentXperienceMajorVersion();
+        subtitle.setText(getString(R.string.changelog_full_subtitle,
+                xperienceVersion.isEmpty() ? getString(R.string.xperience_brand) : xperienceVersion));
+
+        String changelog = mFullChangelog;
+        if (changelog == null || changelog.isEmpty()) {
+            changelog = mChangelogText != null ? mChangelogText.getText().toString() : "";
+        }
+        fullChangelog.setText(styleChangelog(changelog));
+
+        mChangelogDialog = new BottomSheetDialog(this);
+        mChangelogDialog.setContentView(content);
+        mChangelogDialog.setOnShowListener(dialogInterface -> {
+            View bottomSheet = mChangelogDialog.findViewById(
+                    com.google.android.material.R.id.design_bottom_sheet);
+            if (bottomSheet != null) {
+                bottomSheet.setBackgroundColor(android.graphics.Color.TRANSPARENT);
+                BottomSheetBehavior<View> behavior = BottomSheetBehavior.from(bottomSheet);
+                behavior.setSkipCollapsed(true);
+                behavior.setState(BottomSheetBehavior.STATE_EXPANDED);
+            }
+
+            int screenHeight = getResources().getDisplayMetrics().heightPixels;
+            int maxHeight = (int) (720 * getResources().getDisplayMetrics().density);
+            content.getLayoutParams().height = Math.min((int) (screenHeight * 0.84f), maxHeight);
+            content.requestLayout();
+
+            content.setAlpha(0f);
+            content.setTranslationY(dpToPx(56));
+            content.setScaleX(0.965f);
+            content.setScaleY(0.965f);
+            content.post(() -> content.animate()
+                    .alpha(1f)
+                    .translationY(0f)
+                    .scaleX(1f)
+                    .scaleY(1f)
+                    .setDuration(360)
+                    .setInterpolator(new PathInterpolator(0.16f, 1f, 0.3f, 1f))
+                    .start());
+        });
+        mChangelogDialog.setOnDismissListener(dialog -> mChangelogDialog = null);
+
+        closeButton.setOnClickListener(v -> dismissChangelogBottomSheet(content));
+        mChangelogDialog.show();
+    }
+
+    private void dismissChangelogBottomSheet(View content) {
+        if (mChangelogDialog == null) return;
+        content.animate()
+                .alpha(0f)
+                .translationY(dpToPx(44))
+                .scaleX(0.975f)
+                .scaleY(0.975f)
+                .setDuration(210)
+                .setInterpolator(new PathInterpolator(0.4f, 0f, 1f, 1f))
+                .withEndAction(() -> {
+                    if (mChangelogDialog != null) {
+                        mChangelogDialog.dismiss();
+                    }
+                })
+                .start();
+    }
+
+    private float dpToPx(float dp) {
+        return dp * getResources().getDisplayMetrics().density;
+    }
+
     private void updateButtonState(UpdateInfo update) {
-       mx.xperience.updater.model.UpdateStatus status = update.getStatus();
+        UpdateStatus status = update.getStatus();
 
         RelativeLayout downloadInfoContainer = findViewById(R.id.download_info_container);
         TextView downloadSpeedTextView = findViewById(R.id.download_speed);
         TextView downloadPercentageTextView = findViewById(R.id.download_percentage);
         Button cancelButton = findViewById(R.id.cancel_button);
 
+        updateActionSpacer(status);
+        updateStatusCard(status);
+
+        mDownloadButton.setEnabled(true);
+        mDownloadButton.setVisibility(View.VISIBLE);
+
+        if (cancelButton != null) {
+            cancelButton.setText(android.R.string.cancel);
+        }
+
         switch (status) {
             case UNKNOWN:
             case DELETED:
-                mDownloadButton.setVisibility(View.VISIBLE);
                 mDownloadButton.setText(R.string.download);
                 mDownloadProgress.setVisibility(View.GONE);
-                mFabInstall.setVisibility(View.GONE);
-
-                if (cancelButton != null) {
-                    cancelButton.setVisibility(View.GONE);
-                }
+                if (downloadInfoContainer != null) downloadInfoContainer.setVisibility(View.GONE);
+                if (cancelButton != null) cancelButton.setVisibility(View.GONE);
                 break;
 
             case STARTING:
             case DOWNLOADING:
-               mDownloadButton.setVisibility(View.VISIBLE);
-                mDownloadButton.setText(R.string.pause_download);
+                mDownloadButton.setText(status == UpdateStatus.STARTING
+                        ? R.string.download_starting : R.string.pause_download);
                 mDownloadProgress.setVisibility(View.VISIBLE);
-                mDownloadProgress.setIndeterminate(status == mx.xperience.updater.model.UpdateStatus.STARTING);
-                mFabInstall.setVisibility(View.GONE);
-
-                if (downloadInfoContainer != null) {
-                    downloadInfoContainer.setVisibility(View.VISIBLE);
-                }
-
-                if (cancelButton != null) {
-                    cancelButton.setVisibility(View.VISIBLE);
-                    cancelButton.setText(R.string.cancel_download);
-                }
-
-                // Display current speed and percentage
+                mDownloadProgress.setIndeterminate(status == UpdateStatus.STARTING);
+                if (downloadInfoContainer != null) downloadInfoContainer.setVisibility(View.VISIBLE);
+                if (cancelButton != null) cancelButton.setVisibility(View.VISIBLE);
                 if (downloadSpeedTextView != null) {
                     downloadSpeedTextView.setText(formatSpeedAndEta(update));
                 }
@@ -569,99 +729,111 @@ public class UpdatesActivity extends UpdatesListActivity implements UpdateImport
                 }
                 break;
 
-            case VERIFIED:
-                mDownloadButton.setVisibility(View.GONE);
-                mDownloadProgress.setVisibility(View.GONE);
-                mFabInstall.setVisibility(View.VISIBLE);
-
-                if (cancelButton != null) {
-                    cancelButton.setVisibility(View.GONE);
-                }
-                break;
-
             case PAUSED:
             case PAUSED_ERROR:
-                mDownloadButton.setVisibility(View.VISIBLE);
                 mDownloadButton.setText(R.string.resume_download);
-                mDownloadProgress.setVisibility(View.GONE);
-                mFabInstall.setVisibility(View.GONE);
-
-                if (downloadInfoContainer != null) {
-                    downloadInfoContainer.setVisibility(View.VISIBLE);
-                }
-
-                if (cancelButton != null) {
-                    cancelButton.setVisibility(View.VISIBLE);
-                    cancelButton.setText(R.string.cancel_download);
-                }
-
-                // Display current speed and percentage (paused)
+                mDownloadProgress.setVisibility(View.VISIBLE);
+                mDownloadProgress.setIndeterminate(false);
+                mDownloadProgress.setProgress((int) update.getProgress());
+                if (downloadInfoContainer != null) downloadInfoContainer.setVisibility(View.VISIBLE);
+                if (cancelButton != null) cancelButton.setVisibility(View.VISIBLE);
                 if (downloadSpeedTextView != null) {
-                    // When paused, speed = 0
-                    downloadSpeedTextView.setText(formatSpeed(0));
+                    downloadSpeedTextView.setText(R.string.download_paused_notification);
                 }
                 if (downloadPercentageTextView != null) {
                     downloadPercentageTextView.setText(formatPercentage(update));
                 }
                 break;
 
-            case VERIFICATION_FAILED:
-                mDownloadButton.setVisibility(View.VISIBLE);
-                mDownloadButton.setText(R.string.retry_download);
+            case VERIFIED:
+                mDownloadButton.setText(R.string.action_install);
                 mDownloadProgress.setVisibility(View.GONE);
-                mFabInstall.setVisibility(View.GONE);
-                if (cancelButton != null) {
-                    cancelButton.setVisibility(View.GONE);
-                }
+                if (downloadInfoContainer != null) downloadInfoContainer.setVisibility(View.GONE);
+                if (cancelButton != null) cancelButton.setVisibility(View.GONE);
                 break;
 
-            case INSTALLING:
-                mDownloadButton.setVisibility(View.GONE);
-                mDownloadProgress.setVisibility(View.VISIBLE);
-                mDownloadProgress.setIndeterminate(true);
-                mFabInstall.setVisibility(View.GONE);
-                if (cancelButton != null) {
-                    cancelButton.setVisibility(View.GONE);
-                }
+            case VERIFICATION_FAILED:
+                mDownloadButton.setText(R.string.retry_download);
+                mDownloadProgress.setVisibility(View.GONE);
+                if (downloadInfoContainer != null) downloadInfoContainer.setVisibility(View.GONE);
+                if (cancelButton != null) cancelButton.setVisibility(View.GONE);
                 break;
 
             case VERIFYING:
-                mDownloadButton.setVisibility(View.GONE);
+                mDownloadButton.setText(R.string.list_verifying_update);
+                mDownloadButton.setEnabled(false);
                 mDownloadProgress.setVisibility(View.VISIBLE);
                 mDownloadProgress.setIndeterminate(true);
-                mFabInstall.setVisibility(View.GONE);
-
-                if (cancelButton != null) {
-                    cancelButton.setVisibility(View.GONE);
+                if (downloadInfoContainer != null) downloadInfoContainer.setVisibility(View.VISIBLE);
+                if (downloadSpeedTextView != null) {
+                    downloadSpeedTextView.setText(R.string.list_verifying_update);
                 }
+                if (downloadPercentageTextView != null) downloadPercentageTextView.setText("");
+                if (cancelButton != null) cancelButton.setVisibility(View.GONE);
+                break;
+
+            case INSTALLING:
+                mDownloadButton.setText(R.string.installing_update);
+                mDownloadButton.setEnabled(false);
+                mDownloadProgress.setVisibility(View.VISIBLE);
+                if (downloadInfoContainer != null) downloadInfoContainer.setVisibility(View.VISIBLE);
+                if (cancelButton != null) cancelButton.setVisibility(View.GONE);
                 break;
 
             case INSTALLED:
-                mDownloadButton.setVisibility(View.VISIBLE);
                 mDownloadButton.setText(R.string.reboot_to_complete);
                 mDownloadProgress.setVisibility(View.GONE);
-                mFabInstall.setVisibility(View.GONE);
-                
-                // reboot action
-                mDownloadButton.setOnClickListener(v -> {
-                    Utils.rebootDevice(this);
-                });
-                if (cancelButton != null) {
-                    cancelButton.setVisibility(View.GONE);
-                }
+                if (downloadInfoContainer != null) downloadInfoContainer.setVisibility(View.GONE);
+                if (cancelButton != null) cancelButton.setVisibility(View.GONE);
                 break;
+
             case INSTALLATION_FAILED:
             case INSTALLATION_CANCELLED:
             case INSTALLATION_SUSPENDED:
                 mDownloadButton.setVisibility(View.GONE);
                 mDownloadProgress.setVisibility(View.GONE);
-                mFabInstall.setVisibility(View.GONE);
-                if (downloadInfoContainer != null) {
-                    downloadInfoContainer.setVisibility(View.GONE);
-                }
-                if (cancelButton != null) {
-                    cancelButton.setVisibility(View.GONE);
-                }
+                if (downloadInfoContainer != null) downloadInfoContainer.setVisibility(View.GONE);
+                if (cancelButton != null) cancelButton.setVisibility(View.GONE);
+                break;
+        }
+    }
+
+    private void updateActionSpacer(UpdateStatus status) {
+        View topSpacer = findViewById(R.id.update_action_spacer);
+        View bottomSpacer = findViewById(R.id.update_action_bottom_spacer);
+
+        boolean reserveSpace = status == UpdateStatus.VERIFIED
+                || status == UpdateStatus.VERIFICATION_FAILED
+                || status == UpdateStatus.INSTALLED;
+        int visibility = reserveSpace ? View.VISIBLE : View.GONE;
+        if (topSpacer != null) topSpacer.setVisibility(visibility);
+        if (bottomSpacer != null) bottomSpacer.setVisibility(visibility);
+    }
+
+    private void updateStatusCard(UpdateStatus status) {
+        if (mUpdateStatusCard == null || mUpdateStatusTitle == null
+                || mUpdateStatusSubtitle == null) {
+            return;
+        }
+
+        switch (status) {
+            case VERIFIED:
+                mUpdateStatusTitle.setText(R.string.update_status_ready_title);
+                mUpdateStatusSubtitle.setText(R.string.update_status_ready_subtitle);
+                mUpdateStatusCard.setVisibility(View.VISIBLE);
+                break;
+            case INSTALLING:
+                mUpdateStatusTitle.setText(R.string.update_status_installing_title);
+                mUpdateStatusSubtitle.setText(R.string.update_status_installing_subtitle);
+                mUpdateStatusCard.setVisibility(View.VISIBLE);
+                break;
+            case INSTALLED:
+                mUpdateStatusTitle.setText(R.string.update_status_installed_title);
+                mUpdateStatusSubtitle.setText(R.string.update_status_installed_subtitle);
+                mUpdateStatusCard.setVisibility(View.VISIBLE);
+                break;
+            default:
+                mUpdateStatusCard.setVisibility(View.GONE);
                 break;
         }
     }
@@ -711,6 +883,9 @@ public class UpdatesActivity extends UpdatesListActivity implements UpdateImport
 
         mx.xperience.updater.model.UpdateStatus status = update.getStatus();
 
+        updateActionSpacer(status);
+        updateStatusCard(status);
+
         RelativeLayout downloadInfoContainer = findViewById(R.id.download_info_container);
         TextView downloadSpeedTextView = findViewById(R.id.download_speed);
         TextView downloadPercentageTextView = findViewById(R.id.download_percentage);
@@ -753,8 +928,9 @@ public class UpdatesActivity extends UpdatesListActivity implements UpdateImport
             // VERIFICANDO
             mDownloadProgress.setVisibility(View.VISIBLE);
             mDownloadProgress.setIndeterminate(true);
-            mDownloadButton.setVisibility(View.GONE);
-            mFabInstall.setVisibility(View.GONE);
+            mDownloadButton.setVisibility(View.VISIBLE);
+            mDownloadButton.setEnabled(false);
+            mDownloadButton.setText(R.string.list_verifying_update);
             
             if (downloadInfoContainer != null) {
                 downloadInfoContainer.setVisibility(View.VISIBLE);
@@ -770,8 +946,9 @@ public class UpdatesActivity extends UpdatesListActivity implements UpdateImport
         } else if (status == mx.xperience.updater.model.UpdateStatus.INSTALLING) {
             // INSTALANDO
             mDownloadProgress.setVisibility(View.VISIBLE);
-            mDownloadButton.setVisibility(View.GONE);
-            mFabInstall.setVisibility(View.GONE);
+            mDownloadButton.setVisibility(View.VISIBLE);
+            mDownloadButton.setEnabled(false);
+            mDownloadButton.setText(R.string.installing_update);
             
             if (downloadInfoContainer != null) {
                 downloadInfoContainer.setVisibility(View.VISIBLE);
@@ -893,6 +1070,7 @@ public class UpdatesActivity extends UpdatesListActivity implements UpdateImport
                 showCancelInstallationDialog();
                 break;
             case INSTALLED:
+                Utils.rebootDevice(this);
                 break;
             case INSTALLATION_FAILED:
             case INSTALLATION_CANCELLED:
@@ -965,6 +1143,7 @@ public class UpdatesActivity extends UpdatesListActivity implements UpdateImport
         // Hide new design
         findViewById(R.id.update_container).setVisibility(View.GONE);
         findViewById(R.id.changelog_container).setVisibility(View.GONE);
+        if (mUpdateStatusCard != null) mUpdateStatusCard.setVisibility(View.GONE);
 
         // Show original view when there are no updates
         findViewById(R.id.no_new_updates_view).setVisibility(View.VISIBLE);
@@ -972,7 +1151,6 @@ public class UpdatesActivity extends UpdatesListActivity implements UpdateImport
 
         updateLastCheckedView();
 
-        if (mFabInstall != null) mFabInstall.setVisibility(View.GONE);
         if (mDownloadButton != null) mDownloadButton.setVisibility(View.GONE);
         if (mDownloadProgress != null) mDownloadProgress.setVisibility(View.GONE);
 
@@ -1031,8 +1209,7 @@ public class UpdatesActivity extends UpdatesListActivity implements UpdateImport
             showPreferencesDialog();
             return true;
         } else if (itemId == R.id.menu_show_changelog) {
-            // Display message already displayed in the app
-            Toast.makeText(this, R.string.changelog_already_displayed, Toast.LENGTH_SHORT).show();
+            showChangelogBottomSheet();
             return true;
         } else if (itemId == R.id.menu_local_update) {
             mUpdateImporter.openImportPicker();

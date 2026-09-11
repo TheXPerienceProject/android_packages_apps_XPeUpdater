@@ -4,6 +4,5 @@
     SPDX-License-Identifier: Apache-2.0
 -->
 <resources>
-    <integer name="battery_ok_percentage_charging">20</integer>
-    <integer name="battery_ok_percentage_discharging">30</integer>
+    <bool name="updater_light_navigation_bar">true</bool>
 </resources>

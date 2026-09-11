@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    SPDX-FileCopyrightText: 2026 The XPerience Project
+    SPDX-License-Identifier: Apache-2.0
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="1dp"
+    android:height="1dp"
+    android:viewportWidth="360"
+    android:viewportHeight="520">
+
+    <path
+        android:fillColor="#12FFFFFF"
+        android:pathData="M210,-45 C245,40 286,84 382,105 L382,175 C278,150 225,99 176,15 Z" />
+
+    <path
+        android:fillColor="#0DFF6688"
+        android:pathData="M306,-30 C330,45 355,72 392,85 L392,210 C327,182 282,140 250,70 Z" />
+
+    <path
+        android:fillColor="#0FFFFFFF"
+        android:pathData="M28,520 C74,422 170,370 382,318 L382,520 Z" />
+
+    <path
+        android:fillColor="#0AFF5F86"
+        android:pathData="M150,520 C196,441 267,401 382,367 L382,520 Z" />
+</vector>
