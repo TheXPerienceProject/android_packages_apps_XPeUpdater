@@ -155,7 +155,7 @@ public class UpdateImporter {
         update.setTimestamp(timeStamp);
         update.setStatus(UpdateStatus.VERIFIED);
         update.setPersistentStatus(UpdateStatus.Persistent.VERIFIED);
-        update.setVersion(String.format("%s (%s)", name, buildDate));
+	update.setVersion(name);
         return update;
     }
 
